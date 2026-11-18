@@ -200,13 +200,20 @@
     error = '';
     try {
       remote.setServer(remoteUrl);
-      await remote.login(accountNumber.trim());
-      if (rememberDevice) await deviceSecrets.saveAccount({server: remoteUrl, account_number: accountNumber.trim()});
-      else await deviceSecrets.clearAccount();
-      accountNumber = '';
+      const enteredAccount = accountNumber.trim();
+      await remote.login(enteredAccount);
       signedIn = true;
-      remoteVaults = await remote.vaults();
       status = 'Connected';
+      try {
+        if (rememberDevice) await deviceSecrets.saveAccount({
+          server: remoteUrl, account_number: enteredAccount
+        });
+        else await deviceSecrets.clearAccount();
+        accountNumber = '';
+      } catch {
+        error = 'Signed in, but this device could not securely remember the account number. Keep your separate backup.';
+      }
+      try { remoteVaults = await remote.vaults(); } catch { remoteVaults = []; }
       message('Connected to Keylite');
     } catch (e) {
       error = e instanceof Error ? e.message : 'Unable to connect';
