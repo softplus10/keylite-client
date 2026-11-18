@@ -25,7 +25,7 @@ function kdf() {
       outputType: 'binary' as const
     };
     const output = type === 0 ? await argon2d(config) : await argon2id(config);
-    return output.buffer.slice(output.byteOffset, output.byteOffset + output.byteLength);
+    return Uint8Array.from(output).buffer;
   });
   configured = true;
 }
