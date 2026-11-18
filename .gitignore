@@ -1,0 +1,12 @@
+/target
+/cli/target
+/web/node_modules
+/web/.svelte-kit
+/web/build
+/android/node_modules
+/android/android
+/dist
+*.kdbx
+*.keylite.json
+.env
+.DS_Store
