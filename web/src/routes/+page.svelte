@@ -378,8 +378,8 @@
 <input class="sr-only" type="file" accept=".kdbx,application/octet-stream" bind:this={fileInput} on:change={importFile}/>
 
 {#if showNewVault}
-  <div class="modal-backdrop" role="presentation" on:click={() => showNewVault = false}>
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Create a new vault" on:click|stopPropagation>
+  <div class="modal-backdrop" role="presentation" on:click={() => showNewVault = false} on:keydown={(event) => { if (event.key === "Escape") showNewVault = false; }}>
+    <div class="modal" role="dialog" aria-modal="true" tabindex="-1" aria-label="Create a new vault" on:click|stopPropagation on:keydown={(event) => { if (event.key === "Escape") { showConnect = false; showNewVault = false; } }}>
       <div class="modal-title"><div><h3>New Vault</h3><p>Create an encrypted KDBX database.</p></div><button class="icon-button" title="Close" on:click={() => showNewVault = false}><X size={19}/></button></div>
       <label>Vault name<input bind:value={newVaultName} maxlength="80"/></label>
       <label>Master password<input type="password" bind:value={vaultPassword} autocomplete="new-password" placeholder="Use a strong, unique passphrase"/></label>
@@ -390,7 +390,7 @@
 {/if}
 
 {#if showConnect}
-  <div class="modal-backdrop" role="presentation" on:click={() => showConnect = false}>
+  <div class="modal-backdrop" role="presentation" on:click={() => showConnect = false} on:keydown={(event) => { if (event.key === "Escape") showConnect = false; }}>
     <div class="modal connect-modal" role="dialog" aria-modal="true" aria-label="Sync Settings" on:click|stopPropagation>
       <div class="modal-title"><div><h3>Keylite Sync</h3><p>Encrypted vault sync with optimistic concurrency.</p></div><button class="icon-button" title="Close" on:click={() => showConnect = false}><X size={19}/></button></div>
       {#if !signedIn}
@@ -477,7 +477,7 @@
   .item-copy strong,.item-copy span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .item-copy strong{font-size:12.8px;font-weight:680}
   .item-copy span{color:#8c98a7;font-size:11px;margin-top:5px}
-  .chevron{color:#abb4c4}
+  
   .empty-list{display:flex;flex-direction:column;align-items:center;text-align:center;padding:80px 27px;color:#56647b}
   .empty-icon{width:58px;height:58px;border-radius:18px;background:#eef2f9;display:grid;place-items:center;color:#8c9ab1;margin-bottom:17px}
   .empty-list strong{font-size:14px}
@@ -551,5 +551,5 @@
   .error-toast button{border:0;background:transparent;color:white;display:grid;place-items:center}
   @media(max-width:1030px){.sidebar{flex-basis:198px}.list-pane{flex-basis:278px}.details-inner{padding:44px 28px}.details-toolbar{padding:0 19px}}
   @media(max-width:720px){.sidebar{position:absolute;z-index:20;top:0;bottom:0;width:235px;box-shadow:8px 0 25px #25334829}.list-pane{flex:0 0 46%;min-width:180px}.details-inner{padding:35px 23px}.details-toolbar{padding:0 12px}.breadcrumb{display:none}}
-  @media(max-width:510px){.list-pane{flex-basis:43%;min-width:158px}.pane-toolbar{padding:0 8px}.list-intro{padding:10px 13px}.list-intro h1{font-size:18px}.search-box{margin:0 9px 10px}.search-box kbd{display:none}.item{padding:10px 6px;gap:7px}.item-avatar{height:33px;width:33px;border-radius:9px}.item-copy strong{font-size:11px}.item-copy span{font-size:10px}.chevron{display:none}.details-inner{padding:24px 14px}.detail-head{gap:8px}.hero-avatar{width:42px;height:42px;border-radius:13px;font-size:20px}.detail-head h2{font-size:18px}.detail-actions{flex-wrap:wrap}.field{padding:15px 12px}.field>div{gap:5px}.field strong{font-size:11px}.details-toolbar{gap:2px}.pill-button{padding:8px}}
+  @media(max-width:510px){.list-pane{flex-basis:43%;min-width:158px}.pane-toolbar{padding:0 8px}.list-intro{padding:10px 13px}.list-intro h1{font-size:18px}.search-box{margin:0 9px 10px}.search-box kbd{display:none}.item{padding:10px 6px;gap:7px}.item-avatar{height:33px;width:33px;border-radius:9px}.item-copy strong{font-size:11px}.item-copy span{font-size:10px}.details-inner{padding:24px 14px}.detail-head{gap:8px}.hero-avatar{width:42px;height:42px;border-radius:13px;font-size:20px}.detail-head h2{font-size:18px}.detail-actions{flex-wrap:wrap}.field{padding:15px 12px}.field>div{gap:5px}.field strong{font-size:11px}.details-toolbar{gap:2px}.pill-button{padding:8px}}
 </style>
