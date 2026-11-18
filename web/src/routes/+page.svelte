@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import {
     LockKeyhole, Search, Plus, KeyRound, ShieldCheck, Clock3, FolderClosed,
     Settings2, Cloud, CloudOff, RefreshCw, Download, Upload, Eye, EyeOff,
@@ -27,8 +27,10 @@
   let error = '';
   let toast = '';
   let remoteUrl = 'https://keylite.u72mlzb.workers.dev';
-  let email = '';
-  let accountPassword = '';
+  let accountNumber = '';
+  let createdAccount = '';
+  let accountAcknowledged = false;
+  let restoring = false;
   let signedIn = false;
   let remoteVaults: remote.RemoteVault[] = [];
   let remoteId = '';
@@ -173,29 +175,69 @@
       message('Copied to clipboard');
     } catch { error = 'Clipboard access is unavailable'; }
   }
+  onMount(() => {
+    restoring = true;
+    void remote.restoreSession().then(async (restored) => {
+      if (!restored) return;
+      signedIn = true;
+      try {
+        remoteVaults = await remote.vaults();
+        status = 'Connected';
+      } catch {
+        status = 'Connection unavailable';
+      }
+    }).catch((e) => {
+      error = e instanceof Error ? e.message : 'Saved account could not be restored';
+    }).finally(() => restoring = false);
+  });
+
   async function connect() {
     busy = true;
     error = '';
     try {
       remote.setServer(remoteUrl);
-      await remote.login(email, accountPassword);
-      accountPassword = '';
+      await remote.login(accountNumber);
       signedIn = true;
       remoteVaults = await remote.vaults();
       status = 'Connected';
-      message('Connected to Keylite');
+      message('Signed in to Keylite');
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Unable to connect';
+      error = e instanceof Error ? e.message : 'Unable to sign in';
     } finally { busy = false; }
   }
+
+  async function createAccount() {
+    busy = true;
+    error = '';
+    try {
+      remote.setServer(remoteUrl);
+      createdAccount = await remote.register();
+      accountNumber = createdAccount;
+      accountAcknowledged = false;
+      signedIn = true;
+      remoteVaults = [];
+      status = 'Connected';
+      message('Account created. Back up your account number now.');
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Unable to create account';
+    } finally { busy = false; }
+  }
+
   async function disconnect() {
-    await remote.logout();
-    signedIn = false;
-    remoteVaults = [];
-    remoteId = '';
-    remoteETag = null;
-    status = 'Local only';
-    message('Disconnected');
+    try {
+      await remote.logout();
+      signedIn = false;
+      remoteVaults = [];
+      remoteId = '';
+      remoteETag = null;
+      createdAccount = '';
+      accountNumber = '';
+      accountAcknowledged = false;
+      status = 'Local only';
+      message('Signed out and cleared saved device credentials');
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Unable to clear device credentials';
+    }
   }
   async function pushVault() {
     if (!unlocked || !signedIn) return;
@@ -395,11 +437,23 @@
       <div class="modal-title"><div><h3>Keylite Sync</h3><p>Encrypted vault sync with optimistic concurrency.</p></div><button class="icon-button" title="Close" on:click={() => showConnect = false}><X size={19}/></button></div>
       {#if !signedIn}
         <label>Server URL<input type="url" bind:value={remoteUrl} placeholder="https://keylite.example.com"/></label>
-        <label>Email<input type="email" bind:value={email} autocomplete="username"/></label>
-        <label>Account password<input type="password" bind:value={accountPassword} autocomplete="current-password"/></label>
-        <button class="primary-button full" on:click={connect} disabled={busy || !email || !accountPassword}><Cloud size={16}/> Sign in</button>
+        <label>Account number<input bind:value={accountNumber} autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"/></label>
+        <button class="primary-button full" on:click={connect} disabled={busy || restoring || !accountNumber.trim()}><Cloud size={16}/> Sign in with account number</button>
+        <div class="registration-separator"><span>New to Keylite?</span></div>
+        <button class="secondary-button full" on:click={createAccount} disabled={busy || restoring}><Plus size={16}/> Create anonymous account</button>
+        <p class="modal-hint">There is no email or password recovery. The account number is the only server login credential. Your KDBX master password remains separate.</p>
       {:else}
-        <div class="connected"><div class="connected-symbol"><Check size={18}/></div><div><strong>Connected</strong><span>{email} · {remoteUrl}</span></div><button on:click={disconnect}>Sign out</button></div>
+        <div class="connected"><div class="connected-symbol"><Check size={18}/></div><div><strong>Connected</strong><span>Account saved on this device · {remoteUrl}</span></div><button on:click={disconnect}>Sign out</button></div>
+        {#if createdAccount}
+          <div class="account-disclosure">
+            <strong>Save this account number</strong>
+            <p>This number grants access to all synced vaults. If it is lost, the server cannot recover the account.</p>
+            <code>{createdAccount}</code>
+            <button class="secondary-button full" on:click={() => copyText(createdAccount)}><Copy size={16}/> Copy account number</button>
+            <label class="acknowledge"><input type="checkbox" bind:checked={accountAcknowledged}/> I have backed up the account number outside this device.</label>
+            <button class="primary-button full" disabled={!accountAcknowledged} on:click={() => { createdAccount = ''; showConnect = false; }}>Continue</button>
+          </div>
+        {/if}
         <div class="remote-label">REMOTE VAULTS</div>
         {#each remoteVaults as remoteVault}
           <button class="remote-item" on:click={() => pullVault(remoteVault.id)} disabled={busy}>
@@ -540,6 +594,14 @@
   .connected strong{font-size:12px}
   .connected span{font-size:10px;color:#799187;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px}
   .connected button{font-size:11px;color:#568171;border:0;background:none}
+  .registration-separator{text-align:center;color:#a0acbd;font-size:11px;border-top:1px solid #e8ebef;margin:7px 0;line-height:0}
+  .registration-separator span{background:white;padding:0 10px}
+  .account-disclosure{display:flex;flex-direction:column;gap:10px;background:#f2f6fe;border:1px solid #d8e5fa;border-radius:12px;padding:15px;overflow-wrap:anywhere}
+  .account-disclosure strong{font-size:13px}
+  .account-disclosure p{font-size:11px;line-height:1.5;color:#6e7d93;margin:0}
+  .account-disclosure code{font-size:13px;font-weight:650;letter-spacing:.3px;line-height:1.7;word-break:break-word}
+  .acknowledge{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;font-size:11px!important;line-height:1.5}
+  .acknowledge input{width:16px;height:16px}
   .remote-label{font-size:10px;color:#9ba6b7;font-weight:700;letter-spacing:1px;margin-top:6px}
   .remote-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #e7ebf1;border-radius:10px;background:#fff;text-align:left;width:100%}
   .remote-item span{flex:1;min-width:0}
