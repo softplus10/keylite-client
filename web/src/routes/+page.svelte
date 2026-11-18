@@ -191,71 +191,52 @@
     }).finally(() => restoring = false);
   });
 
-  onMount(() => {
-    restoring = true;
-    (async () => {
-      try {
-        const remembered = await deviceSecrets.loadAccount();
-        if (!remembered) return;
-        remote.setServer(remoteUrl);
-        await remote.login(remembered);
-        signedIn = true;
-        remoteVaults = await remote.vaults();
-        status = 'Connected';
-      } catch (e) {
-        error = e instanceof Error ? e.message : 'Saved account sign in failed';
-      } finally {
-        restoring = false;
-      }
-    })();
-  });
-
   async function connect() {
     busy = true;
     error = '';
     try {
       remote.setServer(remoteUrl);
-      await remote.login(accountNumber.trim());
-      if (rememberDevice) await deviceSecrets.saveAccount(accountNumber.trim());
-      else await deviceSecrets.forgetAccount();
-      accountNumber = '';
+      await remote.login(accountNumber);
       signedIn = true;
       remoteVaults = await remote.vaults();
       status = 'Connected';
-      message('Connected to Keylite');
+      message('Signed in to Keylite');
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Unable to connect';
+      error = e instanceof Error ? e.message : 'Unable to sign in';
     } finally { busy = false; }
   }
-  async function registerAccount() {
+
+  async function createAccount() {
     busy = true;
     error = '';
     try {
       remote.setServer(remoteUrl);
-      const registration = await remote.register();
-      newAccountNumber = registration.account_number;
-      if (rememberDevice) await deviceSecrets.saveAccount(newAccountNumber);
-      else await deviceSecrets.forgetAccount();
+      createdAccount = await remote.register();
+      accountNumber = createdAccount;
+      accountAcknowledged = false;
       signedIn = true;
-      remoteVaults = await remote.vaults();
+      remoteVaults = [];
       status = 'Connected';
-      message('Account created. Back up your account number.');
+      message('Account created. Back up your account number now.');
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Account creation failed';
+      error = e instanceof Error ? e.message : 'Unable to create account';
     } finally { busy = false; }
   }
+
   async function disconnect() {
-    try { await remote.logout(); }
-    finally {
-      await deviceSecrets.forgetAccount();
+    try {
+      await remote.logout();
       signedIn = false;
       remoteVaults = [];
       remoteId = '';
       remoteETag = null;
+      createdAccount = '';
       accountNumber = '';
-      newAccountNumber = '';
+      accountAcknowledged = false;
       status = 'Local only';
-      message('Account removed from this device');
+      message('Signed out and cleared saved device credentials');
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Unable to clear device credentials';
     }
   }
   async function pushVault() {
@@ -456,20 +437,21 @@
       <div class="modal-title"><div><h3>Keylite Sync</h3><p>Encrypted vault sync with optimistic concurrency.</p></div><button class="icon-button" title="Close" on:click={() => showConnect = false}><X size={19}/></button></div>
       {#if !signedIn}
         <label>Server URL<input type="url" bind:value={remoteUrl} placeholder="https://keylite.example.com"/></label>
-        <label>Account number<input type="text" bind:value={accountNumber} autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" /></label>
-        <label class="remember-option"><input type="checkbox" bind:checked={rememberDevice} /> Remember this device</label>
-        <p class="modal-hint">A remembered account is encrypted in this browser profile, or protected by Android Keystore in the native app. Anyone controlling this browser origin may still access it.</p>
+        <label>Account number<input bind:value={accountNumber} autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"/></label>
         <button class="primary-button full" on:click={connect} disabled={busy || restoring || !accountNumber.trim()}><Cloud size={16}/> Sign in with account number</button>
-        <button class="secondary-button full" on:click={registerAccount} disabled={busy || restoring}>Create anonymous account</button>
+        <div class="registration-separator"><span>New to Keylite?</span></div>
+        <button class="secondary-button full" on:click={createAccount} disabled={busy || restoring}><Plus size={16}/> Create anonymous account</button>
+        <p class="modal-hint">There is no email or password recovery. The account number is the only server login credential. Your KDBX master password remains separate.</p>
       {:else}
-        <div class="connected"><div class="connected-symbol"><Check size={18}/></div><div><strong>Connected</strong><span>Anonymous Keylite account · {remoteUrl}</span></div><button on:click={disconnect}>Sign out</button></div>
-        {#if newAccountNumber}
-          <div class="account-recovery" role="status">
-            <strong>Save this account number now</strong>
-            <p>This number is your only login credential. If you lose it, the account cannot be recovered.</p>
-            <code>{newAccountNumber}</code>
-            <button class="secondary-button" on:click={() => copyText(newAccountNumber)}><Copy size={15}/> Copy account number</button>
-            <button class="secondary-button" on:click={() => newAccountNumber = ''}>I saved my account number</button>
+        <div class="connected"><div class="connected-symbol"><Check size={18}/></div><div><strong>Connected</strong><span>Account saved on this device · {remoteUrl}</span></div><button on:click={disconnect}>Sign out</button></div>
+        {#if createdAccount}
+          <div class="account-disclosure">
+            <strong>Save this account number</strong>
+            <p>This number grants access to all synced vaults. If it is lost, the server cannot recover the account.</p>
+            <code>{createdAccount}</code>
+            <button class="secondary-button full" on:click={() => copyText(createdAccount)}><Copy size={16}/> Copy account number</button>
+            <label class="acknowledge"><input type="checkbox" bind:checked={accountAcknowledged}/> I have backed up the account number outside this device.</label>
+            <button class="primary-button full" disabled={!accountAcknowledged} on:click={() => { createdAccount = ''; showConnect = false; }}>Continue</button>
           </div>
         {/if}
         <div class="remote-label">REMOTE VAULTS</div>
@@ -620,12 +602,6 @@
   .account-disclosure code{font-size:13px;font-weight:650;letter-spacing:.3px;line-height:1.7;word-break:break-word}
   .acknowledge{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;font-size:11px!important;line-height:1.5}
   .acknowledge input{width:16px;height:16px}
-  .remember-option{display:flex!important;flex-direction:row!important;align-items:center;gap:9px!important}
-  .remember-option input{width:16px;height:16px;flex:none;accent-color:#3779d4}
-  .account-recovery{border:1px solid #d9e2f0;border-radius:12px;background:#f4f7ff;padding:15px;display:grid;gap:10px}
-  .account-recovery strong{font-size:13px;color:#283a5f}
-  .account-recovery p{font-size:11px;color:#65738d;line-height:1.5;margin:0}
-  .account-recovery code{overflow-wrap:anywhere;background:#e8eefb;padding:10px;border-radius:8px;font-size:12px;letter-spacing:.4px}
   .remote-label{font-size:10px;color:#9ba6b7;font-weight:700;letter-spacing:1px;margin-top:6px}
   .remote-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #e7ebf1;border-radius:10px;background:#fff;text-align:left;width:100%}
   .remote-item span{flex:1;min-width:0}
