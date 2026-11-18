@@ -1,44 +1,93 @@
+import { clearAccount, loadAccount, saveAccount } from './secure-storage';
+
 export type RemoteVault = { id: string; name: string; revision: number; hash: string|null };
+export type Registered = { account_number: string; token: string };
 
 const DEFAULT_SERVER = 'https://keylite.u72mlzb.workers.dev';
+let server = DEFAULT_SERVER;
 let base = new URL('/api', DEFAULT_SERVER).toString().replace(/\/$/, '');
 let token = '';
+let activeAccount: string | null = null;
+
 export function setServer(input: string) {
   const url = new URL(input);
-  if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
-    throw new Error('Use an HTTPS URL');
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1'].includes(url.hostname))) {
+    throw new Error('Use an HTTPS server URL');
   }
-  base = url.origin + '/api';
+  server = url.origin;
+  base = server + '/api';
+  token = '';
+  activeAccount = null;
 }
-function api(route: string) {
-  if (!base) throw new Error('Connect to a server first');
-  return base + route;
-}
+
+export function currentAccount(): string | null { return activeAccount; }
+export function hasSession(): boolean { return token.length > 0; }
+
+function api(route: string) { return base + route; }
 function headers(extra: Record<string, string> = {}) {
   if (!token) throw new Error('Sign in first');
   return { Authorization: 'Bearer ' + token, ...extra };
 }
-export type Registration = { account_number: string; token: string };
-export async function register(): Promise<Registration> {
-  const response = await fetch(api('/register'), { method: 'POST' });
-  if (!response.ok) throw new Error('Account creation failed (' + response.status + ')');
-  const result = await response.json() as Registration;
+
+export async function register(): Promise<string> {
+  const response = await fetch(api('/register'), { method: 'POST', cache: 'no-store' });
+  if (!response.ok) throw new Error('Registration failed (' + response.status + ')');
+  const result = await response.json() as Registered;
+  if (!result.account_number || !result.token) throw new Error('Invalid server registration response');
+  // Persist before reporting success, so a failed write never silently loses the only account secret.
+  await saveAccount({ server, account_number: result.account_number });
   token = result.token;
-  return result;
+  activeAccount = result.account_number;
+  return result.account_number;
 }
+
 export async function login(accountNumber: string): Promise<void> {
   const response = await fetch(api('/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ account_number: accountNumber })
   });
-  if (!response.ok) throw new Error('Invalid account number (' + response.status + ')');
-  token = (await response.json() as { token: string }).token;
+  if (!response.ok) throw new Error('Sign in failed (' + response.status + ')');
+  const data = await response.json() as { token: string };
+  if (!data.token) throw new Error('Invalid server response');
+  await saveAccount({ server, account_number: accountNumber });
+  token = data.token;
+  activeAccount = accountNumber;
 }
-export async function logout() {
-  if (token) { try { await fetch(api('/logout'), {method:'POST',headers:headers()}); } catch {/* Offline logout still locks locally. */} }
+
+export async function restoreSession(): Promise<boolean> {
+  const saved = await loadAccount();
+  if (!saved) return false;
+  setServer(saved.server);
+  try {
+    const response = await fetch(api('/login'), {
+      method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_number: saved.account_number })
+    });
+    if (!response.ok) return false;
+    const result = await response.json() as { token: string };
+    if (!result.token) return false;
+    token = result.token;
+    activeAccount = saved.account_number;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function logout(): Promise<void> {
+  if (token) {
+    try {
+      await fetch(api('/logout'), { method: 'POST', headers: headers() });
+    } catch {
+      // Local sign-out still clears the saved credential when offline.
+    }
+  }
   token = '';
+  activeAccount = null;
+  await clearAccount();
 }
+
 export async function vaults(): Promise<RemoteVault[]> {
   const response = await fetch(api('/vaults'), {headers:headers()});
   if (!response.ok) throw new Error('Unable to list vaults');
