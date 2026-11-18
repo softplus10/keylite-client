@@ -14,8 +14,9 @@
     "kdbxweb": "2.1.1",
     "hash-wasm": "^4.12.0",
     "lucide-svelte": "^0.468.0",
-    "@capacitor/core": "^7.0.0",
-    "@aparajita/capacitor-secure-storage": "7.1.6"
+    "@capacitor/core": "^8.0.0",
+    "@aparajita/capacitor-secure-storage": "7.1.6",
+    "@capnative/capacitor-secure-storage": "^8.0.1"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.8",
