@@ -9,7 +9,7 @@ export type SavedAccount = { server: string; account_number: string };
 
 async function nativeStore() {
   if (!Capacitor.isNativePlatform()) return null;
-  const { SecureStorage } = await import('@capnative/capacitor-secure-storage');
+  const { SecureStorage } = await import('@aparajita/capacitor-secure-storage');
   return SecureStorage;
 }
 
