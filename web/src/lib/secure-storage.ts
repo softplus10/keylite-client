@@ -9,7 +9,7 @@ export type SavedAccount = { server: string; account_number: string };
 
 async function nativeStore() {
   if (!Capacitor.isNativePlatform()) return null;
-  const { SecureStorage } = await import('@aparajita/capacitor-secure-storage');
+  const { SecureStorage } = await import('@capnative/capacitor-secure-storage');
   return SecureStorage;
 }
 
@@ -77,7 +77,7 @@ async function wrappingKey(): Promise<CryptoKey> {
 export async function saveAccount(account: SavedAccount): Promise<void> {
   const native = await nativeStore();
   if (native) {
-    await native.setItem(ACCOUNT, JSON.stringify(account));
+    await native.set({ key: ACCOUNT, value: JSON.stringify(account) });
     return;
   }
   const key = await wrappingKey();
@@ -90,8 +90,8 @@ export async function saveAccount(account: SavedAccount): Promise<void> {
 export async function loadAccount(): Promise<SavedAccount | null> {
   const native = await nativeStore();
   if (native) {
-    const raw = await native.getItem(ACCOUNT);
-    return raw ? JSON.parse(raw) as SavedAccount : null;
+    const record = await native.get({ key: ACCOUNT });
+    return record.value ? JSON.parse(record.value) as SavedAccount : null;
   }
   const record = await read(ACCOUNT) as { iv: number[]; ciphertext: number[] } | undefined;
   if (!record) return null;
@@ -110,7 +110,7 @@ export async function loadAccount(): Promise<SavedAccount | null> {
 export async function clearAccount(): Promise<void> {
   const native = await nativeStore();
   if (native) {
-    await native.removeItem(ACCOUNT);
+    await native.remove({ key: ACCOUNT });
   } else {
     await remove(ACCOUNT);
   }
