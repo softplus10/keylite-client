@@ -1,6 +1,7 @@
 export type RemoteVault = { id: string; name: string; revision: number; hash: string|null };
 
-let base = '';
+const DEFAULT_SERVER = 'https://keylite.u72mlzb.workers.dev';
+let base = new URL('/api', DEFAULT_SERVER).toString().replace(/\/$/, '');
 let token = '';
 export function setServer(input: string) {
   const url = new URL(input);
