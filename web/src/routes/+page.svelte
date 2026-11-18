@@ -8,7 +8,7 @@
   } from 'lucide-svelte';
   import * as vault from '$lib/kdbx';
   import * as remote from '$lib/remote';
-  import * as deviceSecrets from '$lib/device-secrets';
+  import * as deviceSecrets from '$lib/secure-storage';
 
   type View = 'all' | 'favorites' | 'codes' | 'groups';
   type Item = vault.Credential;
@@ -182,8 +182,8 @@
       try {
         const remembered = await deviceSecrets.loadAccount();
         if (!remembered) return;
-        remote.setServer(remoteUrl);
-        await remote.login(remembered);
+        remote.setServer(remembered.server);
+        await remote.login(remembered.account_number);
         signedIn = true;
         remoteVaults = await remote.vaults();
         status = 'Connected';
@@ -201,8 +201,8 @@
     try {
       remote.setServer(remoteUrl);
       await remote.login(accountNumber.trim());
-      if (rememberDevice) await deviceSecrets.saveAccount(accountNumber.trim());
-      else await deviceSecrets.forgetAccount();
+      if (rememberDevice) await deviceSecrets.saveAccount({server: remoteUrl, account_number: accountNumber.trim()});
+      else await deviceSecrets.clearAccount();
       accountNumber = '';
       signedIn = true;
       remoteVaults = await remote.vaults();
@@ -219,8 +219,8 @@
       remote.setServer(remoteUrl);
       const registration = await remote.register();
       newAccountNumber = registration.account_number;
-      if (rememberDevice) await deviceSecrets.saveAccount(newAccountNumber);
-      else await deviceSecrets.forgetAccount();
+      if (rememberDevice) await deviceSecrets.saveAccount({server: remoteUrl, account_number: newAccountNumber});
+      else await deviceSecrets.clearAccount();
       signedIn = true;
       remoteVaults = await remote.vaults();
       status = 'Connected';
@@ -232,7 +232,7 @@
   async function disconnect() {
     try { await remote.logout(); }
     finally {
-      await deviceSecrets.forgetAccount();
+      await deviceSecrets.clearAccount();
       signedIn = false;
       remoteVaults = [];
       remoteId = '';
