@@ -18,13 +18,22 @@ function headers(extra: Record<string, string> = {}) {
   if (!token) throw new Error('Sign in first');
   return { Authorization: 'Bearer ' + token, ...extra };
 }
-export async function login(email: string, password: string) {
+export type Registration = { account_number: string; token: string };
+export async function register(): Promise<Registration> {
+  const response = await fetch(api('/register'), { method: 'POST' });
+  if (!response.ok) throw new Error('Account creation failed (' + response.status + ')');
+  const result = await response.json() as Registration;
+  token = result.token;
+  return result;
+}
+export async function login(accountNumber: string): Promise<void> {
   const response = await fetch(api('/login'), {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({email,password})
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_number: accountNumber })
   });
-  if (!response.ok) throw new Error('Sign in failed (' + response.status + ')');
-  token = (await response.json()).token as string;
+  if (!response.ok) throw new Error('Invalid account number (' + response.status + ')');
+  token = (await response.json() as { token: string }).token;
 }
 export async function logout() {
   if (token) { try { await fetch(api('/logout'), {method:'POST',headers:headers()}); } catch {/* Offline logout still locks locally. */} }
