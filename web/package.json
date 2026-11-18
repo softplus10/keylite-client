@@ -13,7 +13,9 @@
     "svelte": "^5.20.0",
     "kdbxweb": "2.1.1",
     "hash-wasm": "^4.12.0",
-    "lucide-svelte": "^0.468.0"
+    "lucide-svelte": "^0.468.0",
+    "@capacitor/core": "^7.0.0",
+    "@aparajita/capacitor-secure-storage": "7.1.6"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.8",
