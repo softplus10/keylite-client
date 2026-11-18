@@ -218,12 +218,19 @@
     try {
       remote.setServer(remoteUrl);
       const registration = await remote.register();
+      // Always reveal the newly issued credential, including when local persistence fails.
       newAccountNumber = registration.account_number;
-      if (rememberDevice) await deviceSecrets.saveAccount({server: remoteUrl, account_number: newAccountNumber});
-      else await deviceSecrets.clearAccount();
       signedIn = true;
-      remoteVaults = await remote.vaults();
       status = 'Connected';
+      try {
+        if (rememberDevice) await deviceSecrets.saveAccount({
+          server: remoteUrl, account_number: newAccountNumber
+        });
+        else await deviceSecrets.clearAccount();
+      } catch {
+        error = 'This device could not save the account number. Copy it to a separate trusted location now.';
+      }
+      try { remoteVaults = await remote.vaults(); } catch { remoteVaults = []; }
       message('Account created. Back up your account number.');
     } catch (e) {
       error = e instanceof Error ? e.message : 'Account creation failed';
