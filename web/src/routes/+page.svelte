@@ -8,6 +8,7 @@
   } from 'lucide-svelte';
   import * as vault from '$lib/kdbx';
   import * as remote from '$lib/remote';
+  import * as deviceSecrets from '$lib/device-secrets';
 
   type View = 'all' | 'favorites' | 'codes' | 'groups';
   type Item = vault.Credential;
@@ -28,8 +29,8 @@
   let toast = '';
   let remoteUrl = 'https://keylite.u72mlzb.workers.dev';
   let accountNumber = '';
-  let createdAccount = '';
-  let accountAcknowledged = false;
+  let newAccountNumber = '';
+  let rememberDevice = true;
   let restoring = false;
   let signedIn = false;
   let remoteVaults: remote.RemoteVault[] = [];
@@ -175,22 +176,6 @@
       message('Copied to clipboard');
     } catch { error = 'Clipboard access is unavailable'; }
   }
-  onMount(() => {
-    restoring = true;
-    void remote.restoreSession().then(async (restored) => {
-      if (!restored) return;
-      signedIn = true;
-      try {
-        remoteVaults = await remote.vaults();
-        status = 'Connected';
-      } catch {
-        status = 'Connection unavailable';
-      }
-    }).catch((e) => {
-      error = e instanceof Error ? e.message : 'Saved account could not be restored';
-    }).finally(() => restoring = false);
-  });
-
   onMount(() => {
     restoring = true;
     (async () => {
